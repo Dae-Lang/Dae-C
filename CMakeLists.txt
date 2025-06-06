@@ -3,8 +3,14 @@ cmake_minimum_required(VERSION 3.22)
 set(PROJECT_NAME DAC)
 project(${PROJECT_NAME})
 
-set(SOURCES src/main.c)
-set(HEADERS) # nothing for now
+set(SOURCES
+    src/error.c
+    src/main.c
+    src/file.c)
+set(HEADERS
+    include/dac/error.h
+    include/dac/file.h
+    include/dac/string.h)
 
 add_executable(${PROJECT_NAME}
     ${SOURCES}
