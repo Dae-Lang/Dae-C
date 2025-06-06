@@ -17,5 +17,5 @@ if [ "$1" = "--termux" ]; then
 
   cd $HOME
   chmod +x DAC
-  ./DAC
+  ./DAC main.dac
 fi

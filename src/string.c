@@ -1,0 +1,52 @@
+#include "dac/string.h"
+
+#include <stdlib.h>
+
+#include "dac/bool.h"
+#include "dac/error.h"
+
+size_t String_Length(String str) {
+  size_t len = 0;
+  while (str[len] != '\0') {
+    len++;
+  }
+  return len;
+}
+
+Bool String_StartsWith(String str, String startWith, size_t offset) {
+  if (strncmp(str + offset, startWith, String_Length(startWith)) == 0) {
+    return true;
+  }
+  return false;
+}
+
+size_t String_IndexOf(const String str, char ch, size_t offset) {
+  String ptr = strchr(str + offset, ch);
+  if (ptr == NULL) {
+    printf("Failed to get index of string %s\n", str);
+    return SIZE_MAX;
+  }
+  return ptr - str;
+}
+
+String String_Substring(const String str, size_t start, size_t end) {
+  if (!str || start > end || end > String_Length(str)) {
+    return NULL;
+  }
+
+  size_t len = end - start;
+  String result = malloc(len + 1);
+  if (!result)
+    return NULL;
+
+  memcpy(result, str + start, len);
+  result[len] = '\0';
+  return result;
+}
+
+Bool String_Equals(const String str, const String other) {
+  if (strcmp(str, other) == 0) {
+    return true;
+  }
+  return false;
+}
