@@ -56,7 +56,7 @@ void Tokenizer_Tokenize(Tokenizer* tokenizer) {
       continue;
     }
     if (c == '"') {
-      unsigned int end =
+      size_t end =
           String_IndexOf(tokenizer->__input__, '"', tokenizer->__pos__ + 1);
       if (end == SIZE_MAX) {
         printf("Unclosed string\n");
