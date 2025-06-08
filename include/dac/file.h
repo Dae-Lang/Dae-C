@@ -15,6 +15,8 @@ typedef struct {
 
 File* File_Open(String, String);
 
+void File_Close(File*);
+
 size_t File_GetLength(File*);
 
 String File_ReadText(File*);

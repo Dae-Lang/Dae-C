@@ -1,0 +1,30 @@
+name: Build with Make
+
+on:
+  push:
+    branches: [ "**" ]
+    paths-ignore:
+      - '**/*.md'
+  pull_request:
+    branches: [ "**" ]
+    paths-ignore:
+      - '**/*.md'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Install dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y make cmake clang
+
+    - name: Run Make.sh script
+      run: |
+        chmod +x ./Make.sh
+        ./Make.sh

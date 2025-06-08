@@ -1,21 +1,65 @@
+#include <assert.h>
 #include <stdio.h>
 
+#include "dac/bool.h"
 #include "dac/file.h"
+#include "dac/interpreter.h"
+#include "dac/lexer.h"
+#include "dac/parser.h"
 #include "dac/string.h"
 
-int main(int argc, char* argv[]) {
+Bool Interpret(File* file) {
+  String src = File_ReadText(file);
+
+  Lexer* lexer = Lexer_New(src);
+  assert(lexer);
+  Lexer_Tokenize(lexer);
+
+  Parser* parser = Parser_New(lexer->tokens);
+  assert(parser);
+
+  NodeVector* nodes = Parser_ParseProgram(parser);
+  assert(nodes);
+
+  Interpreter* interpreter = Interpreter_New(nodes);
+  assert(interpreter);
+
+  InterpreterResult result = Interpreter_Run(interpreter);
+
+  assert(result.data);
+
+  Parser_Delete(parser);
+  Lexer_Delete(lexer);
+
+  return true;
+}
+
+Bool Run(int argc, char* argv[]) {
   if (argc < 2) {
-    printf("Please provide at least 1 file.\n");
-    return 1;
+    printf("Usage: %s <action> <file>\n", argv[0]);
+    printf("Use %s help for more info.\n", argv[0]);
+    return false;
   }
+  String action = argv[1];
+  if (String_Equals(action, "run")) {
+    // TODO: SUPPORT MULTIPLES FILES
+    if (argc < 3) {
+      printf("Please provide at least 1 file!\n");
+      return false;
+    }
+    File* file = File_Open(argv[2], FileMode_Read);
+    Bool interRes = Interpret(file);
+    File_Close(file);
+    return interRes;
+  } else if (String_Equals(action, "help")) {
+    printf("%s help        : prints help\n", argv[0]);
+    printf("%s run <files> : executes an dac file.\n", argv[0]);
+    return true;
+  }
+  return false;
+}
 
-  File* srcFile = File_Open(argv[1], FileMode_Read);
-  String src = File_ReadText(srcFile);
-  printf("DAC CODE:\n\n%s\n", src);
-
-
-  // TODO START THE INTERPRETATION
-
-
-  return 0;
+int main(int argc, char* argv[]) {
+  Bool runRes = Run(argc, argv);
+  return runRes ? 0 : 1;
 }
