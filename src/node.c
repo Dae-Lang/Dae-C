@@ -18,14 +18,6 @@ Node* FunctionNode_New(String name,
   return node;
 }
 
-Node* PrintNode_New(NodePrintMessageType type, String message) {
-  Node* node = malloc(sizeof(Node));
-  node->type = NODE_PRINT;
-  node->print_n.message = message;
-  node->print_n.printMessageType = type;
-  return node;
-}
-
 Node* CallNode_New(const String functionName, Vector* functionParams) {
   Node* node = malloc(sizeof(Node));
   node->type = NODE_CALL;

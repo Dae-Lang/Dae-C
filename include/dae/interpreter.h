@@ -7,25 +7,25 @@
 #include "dae/vector.h"
 
 typedef struct {
-  NodeVector* nodes;
   HashMap* functions;
+  HashMap* nativeFunctions;
 } Interpreter;
 
-typedef enum { IRT_NONE, IRT_RETURN } InterpreterResultType;
+typedef enum { IRT_FUNC, IRT_RETURN } InterpreterResultType;
 
 typedef struct {
   void* data;
   InterpreterResultType type;
 } InterpreterResult;
 
-Interpreter* Interpreter_New(NodeVector* nodes);
+Interpreter* Interpreter_New(NodeVector*, NodeVector*);
 
-void Interpreter_Delete(Interpreter* interpreter);
+void Interpreter_Delete(Interpreter*);
 
-InterpreterResult Interpreter_Run(Interpreter* interpreter);
+InterpreterResult Interpreter_Run(Interpreter*);
 
-InterpreterResult Interpreter_RunFunc(Interpreter* interpreter, Node* func);
+InterpreterResult Interpreter_RunFunc(Interpreter*, Node*);
 
-InterpreterResult Interpreter_RunNode(Interpreter* interpreter, Node* node);
+InterpreterResult Interpreter_RunNode(Interpreter*, Node*);
 
 #endif

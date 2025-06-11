@@ -1,6 +1,7 @@
 #ifndef STRING_H
 #define STRING_H
 
+#include <stdarg.h>
 #include <stdlib.h>
 
 typedef char* String;
@@ -18,5 +19,7 @@ bool String_Equals(const String, const String);
 void String_Concat(String, String);
 
 int String_ToInt(String);
+
+String String_Format(const String, ...);
 
 #endif

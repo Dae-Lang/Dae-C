@@ -7,36 +7,45 @@
 #include "dae/error.h"
 #include "dae/hashmap.h"
 #include "dae/node.h"
+#include "dae/parser.h"
 
-Interpreter* Interpreter_New(NodeVector* nodes) {
-  assert(nodes);
+Interpreter* Interpreter_New(NodeVector* funcNodes, NodeVector* nativeFunctionsNodes) {
+  assert(funcNodes);
+  assert(nativeFunctionsNodes);
   Interpreter* interpreter = malloc(sizeof(Interpreter));
-  interpreter->nodes = nodes;
   interpreter->functions = HashMap_New(sizeof(Node*));
-
+  interpreter->nativeFunctions = HashMap_New(sizeof(NativeFunction));
+  
   // register all funcs
-  for (int i = 0; i < nodes->size; i++) {
-    Node* node = (Node*)Vector_Get(nodes, i);
+  for (int i = 0; i < funcNodes->size; i++) {
+    Node* node = (Node*)Vector_Get(funcNodes, i);
     if (node->type == NODE_FUNCTION) {
       HashMap_Put(interpreter->functions, node->function_n.name, &node);
     }
+  }
+
+  for (int i = 0; i < nativeFunctionsNodes->size; i++) {
+    NativeFunctionEntry* entry = (NativeFunctionEntry*) Vector_Get(nativeFunctionsNodes, i);
+    HashMap_Put(interpreter->nativeFunctions, entry->name, &entry->fn);
   }
 
   return interpreter;
 }
 
 void Interpreter_Delete(Interpreter* self) {
-  // maybe desallocate nodes?
+  free(self->functions);
+  free(self->nativeFunctions);
   free(self);
 }
 
 InterpreterResult Interpreter_Run(Interpreter* self) {
   assert(self);
 
-  Node* main = *(Node**)HashMap_Get(self->functions, "main");
-  if (main == NULL) {
+  Node** mainPtr = (Node**)HashMap_Get(self->functions, "main");
+  if (mainPtr == NULL) {
     Error_Fatal("Your program needs a main function!\n");
   }
+  Node* main = *mainPtr;
 
   return Interpreter_RunFunc(self, main);
 }
@@ -55,7 +64,10 @@ InterpreterResult Interpreter_RunFunc(Interpreter* self, Node* func) {
   }
 
   // default value
-  InterpreterResult ret = {.type = IRT_RETURN, .data = NULL};
+  InterpreterResult ret = {
+    .type = IRT_RETURN,
+    .data = NULL
+  };
   return ret;
 }
 
@@ -64,26 +76,36 @@ InterpreterResult Interpreter_RunNode(Interpreter* self, Node* node) {
   assert(node);
 
   switch (node->type) {
-    case NODE_PRINT:
-      printf("%s\n", node->print_n.message);
-      return (InterpreterResult){.type = IRT_NONE, .data = NULL};
-
     case NODE_CALL: {
-      Node* called =
-          *(Node**)HashMap_Get(self->functions, node->call_n.functionName);
-      if (called == NULL) {
-        Error_Fatal("Function not found: %s\n", node->call_n.functionName);
+      Node** calledPtr = (Node**)HashMap_Get(self->functions, node->call_n.functionName);
+      if (calledPtr != NULL) {
+        Node* called = *calledPtr;
+        return Interpreter_RunFunc(self, called);
       }
-      return Interpreter_RunFunc(self, called);
+      NativeFunction* nativeFnPtr = (NativeFunction*)HashMap_Get(self->nativeFunctions, node->call_n.functionName);
+      if (nativeFnPtr != NULL) {
+        NativeFunction nativeFn = *nativeFnPtr;
+        return (InterpreterResult) {
+          .data = nativeFn(node->call_n.functionParams),
+          .type = IRT_FUNC
+        };
+      }
+
+      Error_Fatal("Function not found: %s\n", node->call_n.functionName);
     }
 
     case NODE_RETURN: {
-      return (InterpreterResult){.type = IRT_RETURN,
-                                 .data = node->return_n.returnValue};
+      return (InterpreterResult) {
+        .type = IRT_RETURN,
+        .data = node->return_n.returnValue
+      };
     }
 
     default:
-      Error_Fatal("Unknown node type %d\n", node->type);
+    Error_Fatal("Unknown node type %d\n", node->type);
   }
-  return (InterpreterResult){.type = IRT_RETURN, .data = NULL};
+  return (InterpreterResult) {
+    .type = IRT_RETURN,
+    .data = NULL
+  };
 }

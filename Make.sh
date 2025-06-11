@@ -6,6 +6,7 @@ INSTALL_P=false
 RUN_P=false
 
 TERMUX_P=false
+ASAN_P=false
 
 YELLOW="\e[33m"
 LGREEN="\e[92m"
@@ -18,10 +19,11 @@ print_help_and_close() {
   echo -e "$RESET"
   echo "Usage Make.sh <option>"
   echo "Options:"
-  echo -e "$LGREEN-i or --install | $LMAGENTA Compile and install."
-  echo -e "$LGREEN-r or --run     | $LMAGENTA Compile and run."
-  echo -e "$LGREEN-t or --termux  | $LMAGENTA [USE WITH -r] Compile and run it fixing termux restrictions."
-  echo -e "$LGREEN-h or --help    | $LMAGENTA Prints help."
+  echo -e "$LGREEN-i  or --install | $LMAGENTA Compile and install."
+  echo -e "$LGREEN-r  or --run     | $LMAGENTA Compile and run."
+  echo -e "$LGREEN-t  or --termux  | $LMAGENTA [USE WITH -r] Compile and run it fixing termux restrictions."
+  echo -e "$LGREEN-h  or --help    | $LMAGENTA Prints help."
+  echo -e "$LGREEN-as or --asan    | $LMAGENTA Enables Address Sanitizer."
   echo ""
   echo -e "$YELLOW"
   echo "WARNING"
@@ -50,6 +52,12 @@ for arg in "$@"; do
     --termux)
       TERMUX_P=true
       ;;
+    -as)
+      ASAN_P=true
+      ;;
+    --asan)
+      ASAN_P=true
+      ;;
     -h)
       print_help_and_close
       ;;
@@ -62,7 +70,9 @@ for arg in "$@"; do
   esac
 done
 
-export INSTALL=$INSTALL_P
+if [ "$ASAN_P" = true ]; then
+  export ASAN=true
+fi
 
 # Creates build dir (if needed) and enter in it
 mkdir -p build
@@ -70,6 +80,7 @@ cd build
 
 # Create CMake Build files based on INSTALL option
 if [ "$INSTALL_P" = true ]; then
+  export INSTALL=$INSTALL_P
   cmake .. -DCMAKE_INSTALL_PREFIX=$HOME/../usr
 else
   cmake ..

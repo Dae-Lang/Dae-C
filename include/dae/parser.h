@@ -8,9 +8,17 @@
 #include "dae/string.h"
 #include "dae/vector.h"
 
+typedef Node* (*NativeFunction)(Vector*);
+
+typedef struct {
+  String name;
+  NativeFunction fn;
+} NativeFunctionEntry;
+
 typedef struct {
   Vector* tokens;
   NodeVector* functions;
+  NodeVector* nativeFunctions;
   unsigned int __pos__;
 } Parser;
 
@@ -22,11 +30,17 @@ Token* Parser_Consume(Parser*, TokenType);
 
 Node* Parser_FindFunction(Parser*, String);
 
+void Parser_RegisterNativeFunction(Parser*, String, NativeFunction);
+
+NativeFunction Parser_FindNativeFunction(Parser*, String);
+
+String Parser_GetTypeFromToken(TokenType);
+
 Node* Parser_ParseFunction(Parser*);
 
 Node* Parser_ParseStatement(Parser*);
 
-NodeVector* Parser_ParseProgram(Parser*);
+void Parser_ParseProgram(Parser*);
 
 void Parser_Error(String, ...);
 
