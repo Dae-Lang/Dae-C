@@ -7,6 +7,7 @@
 #include "dae/error.h"
 #include "dae/lexer.h"
 #include "dae/node.h"
+#include "dae/parser_native_funcs.h"
 #include "dae/string.h"
 #include "dae/vector.h"
 
@@ -18,6 +19,8 @@ Parser* Parser_New(Vector* tokens) {
 }
 
 void Parser_Delete(Parser* parser) {
+  Vector_Delete(parser->functions);
+  Vector_Delete(parser->nativeFunctions);
   free(parser);
 }
 
@@ -41,34 +44,45 @@ Node* Parser_FindFunction(Parser* parser, String name) {
   return NULL;
 }
 
+void Parser_RegisterNativeFunction(Parser* parser, String name, NativeFunction fn) {
+  NativeFunctionEntry entry = {
+    name,
+    fn
+  };
+  Vector_PushBack(parser->nativeFunctions, &entry);
+}
+
+NativeFunction Parser_FindNativeFunction(Parser* parser, String name) {
+  for (size_t i = 0; i < parser->nativeFunctions->size; ++i) {
+    NativeFunctionEntry* entry = (NativeFunctionEntry*) Vector_Get(parser->nativeFunctions, i);
+    if (String_Equals(entry->name, name)) {
+      return entry->fn;
+    }
+  }
+  return NULL;
+}
+
+void Parser_RegisterNatives(Parser* parser) {
+  parser->nativeFunctions = Vector_New(sizeof(NativeFunctionEntry));
+  Parser_RegisterNativeFunction(parser, "print", Parser_Native_Print);
+}
+
+String Parser_GetTypeFromToken(TokenType type) {
+  switch (type) {
+    case TOKEN_STRING:
+      return "string";
+    case TOKEN_BOOLEAN:
+      return "bool";
+    case TOKEN_NUMBER:
+      return "number";
+    default:
+      return "unknownType";
+  }
+}
+
 Node* Parser_ParseStatement(Parser* parser) {
   Token* token = (Token*)Vector_Get(parser->tokens, parser->__pos__);
-  if (String_Equals(token->text, "print")) {
-    Parser_Consume(parser, TOKEN_KEYWORD);
-    Parser_Consume(parser, TOKEN_ARROW);
-
-    Token* next = (Token*)Vector_Get(parser->tokens, parser->__pos__);
-
-    NodePrintMessageType type;
-    String message;
-
-    if (next->type == TOKEN_BOOLEAN) {
-      type = NODE_PRINT_BOOL;
-      message = Parser_Consume(parser, TOKEN_BOOLEAN)->text;
-    } else if (next->type == TOKEN_STRING) {
-      type = NODE_PRINT_STRING;
-      message = Parser_Consume(parser, TOKEN_STRING)->text;
-    } else if (next->type == TOKEN_NUMBER) {
-      type = NODE_PRINT_NUMBER;
-      message = Parser_Consume(parser, TOKEN_NUMBER)->text;
-    } else {
-      Parser_Error(
-          "Invalid value after 'print ->'. Expected boolean, string or "
-          "number.");
-    }
-
-    return PrintNode_New(type, message);
-  } else if (String_Equals(token->text, "return")) {
+  if (String_Equals(token->text, "return")) {
     Parser_Consume(parser, TOKEN_KEYWORD);
     Parser_Consume(parser, TOKEN_ARROW);
     Token* next = (Token*)Vector_Get(parser->tokens, parser->__pos__);
@@ -78,12 +92,12 @@ Node* Parser_ParseStatement(Parser* parser) {
       bool rawbool = false;
       String boolStr = Parser_Consume(parser, TOKEN_BOOLEAN)->text;
       if (String_Equals(boolStr, "true"))
-        rawbool = true;
+      rawbool = true;
       value = (void*)(intptr_t)rawbool;
       type = NODE_RETURN_BOOL;
     } else if (next->type == TOKEN_NUMBER) {
       value = (void*)(intptr_t)String_ToInt(
-          Parser_Consume(parser, TOKEN_NUMBER)->text);
+        Parser_Consume(parser, TOKEN_NUMBER)->text);
       type = NODE_RETURN_NUMBER;
     } else if (next->type == TOKEN_STRING) {
       value = Parser_Consume(parser, TOKEN_STRING)->text;
@@ -94,71 +108,72 @@ Node* Parser_ParseStatement(Parser* parser) {
     String name = Parser_Consume(parser, TOKEN_IDENTIFIER)->text;
     Token* next = (Token*)Vector_Get(parser->tokens, parser->__pos__);
 
-    Node* fn = Parser_FindFunction(parser, name);
-    if (fn == NULL) {
-      Parser_Error("Function not declared: %s", name);
-    }
-
+    // call with () no args
     if (next->type == TOKEN_LPAREN) {
-      if (fn->function_n.params != NULL) {
-        if (fn->function_n.params->size >= 1) {
-          printf("Function %s expect argumenets : ", name);
-          for (size_t i = 0; i < fn->function_n.params->size; ++i) {
-            NodeFunctionParam* param =
-                (NodeFunctionParam*)Vector_Get(fn->function_n.params, i);
-            printf("%s: %s ", param->type, param->name);
-          }
-          printf("\n");
-          Parser_Error("Missing arguments!");
-        }
-      }
       Parser_Consume(parser, TOKEN_LPAREN);
       Parser_Consume(parser, TOKEN_RPAREN);
       return CallNode_New(name, NULL);
-    } else if (next->type == TOKEN_ARROW) {
-      Parser_Consume(parser, TOKEN_ARROW);
+    }
 
-      size_t expectedArgs = fn->function_n.params->size;
+    // call with ->
+    if (next->type == TOKEN_ARROW) {
+      Parser_Consume(parser, TOKEN_ARROW);
       Vector* args = Vector_New(sizeof(String));
 
-      for (size_t i = 0; i < expectedArgs; i++) {
+      while (true) {
         Token* arg = (Token*)Vector_Get(parser->tokens, parser->__pos__);
 
-        NodeFunctionParam* param =
-            (NodeFunctionParam*)Vector_Get(fn->function_n.params, i);
-        String expectedType = param->type;
-
-        bool typeOk =
-            (arg->type == TOKEN_STRING &&
-             String_Equals(expectedType, "string")) ||
-            (arg->type == TOKEN_BOOLEAN &&
-             String_Equals(expectedType, "bool")) ||
-            (arg->type == TOKEN_NUMBER && String_Equals(expectedType, "int"));
-
-        if (!typeOk) {
-          Parser_Error("Argument %zu to '%s' must be of type %s", i + 1, name,
-                       expectedType);
+        if (arg->type != TOKEN_STRING &&
+          arg->type != TOKEN_BOOLEAN &&
+          arg->type != TOKEN_NUMBER) {
+          break;
         }
 
-        Vector_PushBack(args, arg->text);
+        Vector_PushBack(args, arg->text); 
         Parser_Consume(parser, arg->type);
+        free(arg);
 
-        // verify the comma
-        if (i < expectedArgs - 1) {
-          Token* comma = (Token*)Vector_Get(parser->tokens, parser->__pos__);
-          if (comma->type != TOKEN_COMMA) {
-            Parser_Error(
-                "Expected ',' between arguments in function call to '%s'",
-                name);
-          }
+        Token* comma = (Token*)Vector_Get(parser->tokens, parser->__pos__);
+        if (comma->type == TOKEN_COMMA) {
           Parser_Consume(parser, TOKEN_COMMA);
+        } else {
+          break;
         }
       }
 
-      return CallNode_New(name, args);
+      Node* fn = Parser_FindFunction(parser, name);
+      if (fn != NULL) {
+        size_t expected = fn->function_n.params->size;
+        if (args->size != expected) {
+          Parser_Error("Function '%s' expects %zu arguments but got %zu.",
+            name, expected, args->size);
+        }
+
+        for (size_t i = 0; i < expected; ++i) {
+          NodeFunctionParam* param = (NodeFunctionParam*) Vector_Get(fn->function_n.params, i);
+          Token* token = (Token*)Vector_Get(parser->tokens, parser->__pos__ - args->size + i);
+          String expectedType = param->type;
+          String actualType = Parser_GetTypeFromToken(token->type);
+
+          if (!String_Equals(expectedType, actualType)) {
+            Parser_Error("Argument %zu to '%s' must be of type %s, got %s",
+              i + 1, name, expectedType, actualType);
+          }
+        }
+
+        return CallNode_New(name, args);
+      }
+
+      // check if its native
+      NativeFunction nativeFn = Parser_FindNativeFunction(parser, name);
+      if (nativeFn != NULL) {
+        return CallNode_New(name, args);
+      }
+
+      Parser_Error("Function '%s' is not declared and is not a native function.", name);
     }
 
-    Parser_Error("Unexpected token after identifier %s", next->type);
+    Parser_Error("Unexpected token after identifier: %s", next->text);
   }
   Parser_Error("Unknown statement: %s", token->text);
   return NULL;
@@ -182,7 +197,10 @@ Node* Parser_ParseFunction(Parser* parser) {
     Parser_Consume(parser, TOKEN_COLON);
     String name = Parser_Consume(parser, TOKEN_IDENTIFIER)->text;
 
-    NodeFunctionParam param = {name, type};
+    NodeFunctionParam param = {
+      name,
+      type
+    };
     Vector_PushBack(params, &param);
 
     next = (Token*)Vector_Get(parser->tokens, parser->__pos__);
@@ -193,7 +211,7 @@ Node* Parser_ParseFunction(Parser* parser) {
 
   String returnType = NULL;
   if (((Token*)Vector_Get(parser->tokens, parser->__pos__))->type ==
-      TOKEN_COLON) {
+    TOKEN_COLON) {
     Parser_Consume(parser, TOKEN_COLON);
     returnType = Parser_Consume(parser, TOKEN_TYPE)->text;
     Parser_Consume(parser, TOKEN_ARROW);
@@ -202,7 +220,7 @@ Node* Parser_ParseFunction(Parser* parser) {
   Parser_Consume(parser, TOKEN_LBRACE);
   Vector* body = Vector_New(sizeof(Node));
   while (((Token*)Vector_Get(parser->tokens, parser->__pos__))->type !=
-         TOKEN_RBRACE) {
+    TOKEN_RBRACE) {
     Vector_PushBack(body, Parser_ParseStatement(parser));
   }
 
@@ -210,13 +228,13 @@ Node* Parser_ParseFunction(Parser* parser) {
   return FunctionNode_New(name, returnType, body, params);
 }
 
-NodeVector* Parser_ParseProgram(Parser* parser) {
+void Parser_ParseProgram(Parser* parser) {
   parser->functions = Vector_New(sizeof(Node));
+  Parser_RegisterNatives(parser);
   do {
     Vector_PushBack(parser->functions, Parser_ParseFunction(parser));
   } while (((Token*)Vector_Get(parser->tokens, parser->__pos__))->type !=
-           TOKEN_EOF);
-  return parser->functions;
+    TOKEN_EOF);
 }
 
 void Parser_Error(String fmt, ...) {

@@ -12,12 +12,13 @@
 Lexer* Lexer_New(String input) {
   Lexer* lexer = malloc(sizeof(Lexer));
   lexer->__pos__ = 0;
-  lexer->__input__ = input;
+  lexer->__input__ = strdup(input);
   return lexer;
 }
 
 void Lexer_Delete(Lexer* lexer) {
   Vector_Delete(lexer->tokens);
+  free(lexer->__input__);
   free(lexer);
 }
 
@@ -110,7 +111,7 @@ void Lexer_Tokenize(Lexer* lexer) {
         break;
       }
 
-      if (String_Equals(word, "work") || String_Equals(word, "print") ||
+      if (String_Equals(word, "work") ||
           String_Equals(word, "return")) {
         Vector_PushBack(lexer->tokens, ((void*)Token_New(TOKEN_KEYWORD, word)));
       } else if (String_Equals(word, "true") || String_Equals(word, "false")) {

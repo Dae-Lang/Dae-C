@@ -12,6 +12,15 @@ else()
   set(INSTALL FALSE)
 endif()
 
+
+if(DEFINED ENV{ASAN})
+  message(STATUS "AddressSanitizer enabled")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address -fno-omit-frame-pointer")
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address")
+endif()
+
+
 if(INSTALL)
   include(GNUInstallDirs)
 endif()
@@ -24,6 +33,7 @@ set(LIB_SOURCES
     src/lexer.c
     src/node.c
     src/parser.c
+    src/parser_native_funcs.c
     src/string.c
     src/vector.c)
 
@@ -36,6 +46,7 @@ set(HEADERS
     include/dae/lexer.h
     include/dae/node.h
     include/dae/parser.h
+    include/dae/parser_native_funcs.h
     include/dae/string.h
     include/dae/vector.h)
 
@@ -58,7 +69,6 @@ target_link_libraries(${PROJECT_NAME}
     PRIVATE
     Dae::DaeC)
 
-# Instalação
 if(INSTALL)
   # install cli executable
   install(TARGETS ${PROJECT_NAME}

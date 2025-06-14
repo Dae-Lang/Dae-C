@@ -1,15 +1,14 @@
 #include <assert.h>
 #include <stdio.h>
 
+#include "dae/error.h"
 #include "dae/file.h"
 #include "dae/interpreter.h"
 #include "dae/lexer.h"
 #include "dae/parser.h"
 #include "dae/string.h"
 
-bool Interpret(File* file) {
-  String src = File_ReadText(file);
-
+bool Interpret(String src) {
   Lexer* lexer = Lexer_New(src);
   assert(lexer);
   Lexer_Tokenize(lexer);
@@ -17,19 +16,18 @@ bool Interpret(File* file) {
   Parser* parser = Parser_New(lexer->tokens);
   assert(parser);
 
-  NodeVector* nodes = Parser_ParseProgram(parser);
-  assert(nodes);
+  Parser_ParseProgram(parser);
 
-  Interpreter* interpreter = Interpreter_New(nodes);
+  Interpreter* interpreter = Interpreter_New(parser->functions, parser->nativeFunctions);
   assert(interpreter);
 
   InterpreterResult result = Interpreter_Run(interpreter);
 
   assert(result.data);
 
+  Interpreter_Delete(interpreter);
   Parser_Delete(parser);
   Lexer_Delete(lexer);
-
   return true;
 }
 
@@ -43,11 +41,21 @@ bool Run(int argc, char* argv[]) {
   if (String_Equals(action, "run")) {
     // TODO: SUPPORT MULTIPLES FILES
     if (argc < 3) {
-      printf("Please provide at least 1 file!\n");
+      Error_Fatal("Please provide at least 1 file!\n");
       return false;
     }
     File* file = File_Open(argv[2], FileMode_Read);
-    bool interRes = Interpret(file);
+    if (file == NULL) {
+      Error_Fatal("Failed to open %s\n", argv[2]);
+      return false;
+    }
+    String src = File_ReadText(file);
+    if (src == NULL) {
+      Error_Fatal("Failed to read %s\n", argv[2]);
+      return false;
+    }
+    bool interRes = Interpret(src);
+    free(src);
     File_Close(file);
     return interRes;
   } else if (String_Equals(action, "help")) {

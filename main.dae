@@ -1,0 +1,5 @@
+work main(): bool -> {
+  print -> "Ooa"
+  print -> "Hello from work"
+  return -> false
+}

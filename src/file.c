@@ -45,12 +45,12 @@ String File_ReadText(File* file) {
     return NULL;
   }
   size_t fileLen = File_GetLength(file);
-  String buffer = malloc(fileLen + 1);  // 1 for null-terminate
+  String buffer = malloc(fileLen  + 1);  // 1 for null-terminate
   if (buffer == NULL) {
     Error_Fatal("Failed to allocate memory to read file %s\n", file->path);
     return NULL;
   }
   fread(buffer, 1, fileLen, file->stdFile);  // read file into buffer
-  buffer[fileLen + 1] = '\0';                // null-terminate.
+  buffer[fileLen] = '\0';                // null-terminate.
   return buffer;
 }

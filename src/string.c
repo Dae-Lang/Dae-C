@@ -36,7 +36,7 @@ String String_Substring(const String str, size_t start, size_t end) {
   size_t len = end - start;
   String result = malloc(len + 1);
   if (!result)
-    return NULL;
+  return NULL;
 
   memcpy(result, str + start, len);
   result[len] = '\0';
@@ -64,4 +64,21 @@ int String_ToInt(const String src) {
     }
   }
   return num;
+}
+
+String String_Format(const String fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+
+  size_t len = vsnprintf(NULL, 0, fmt, args);
+  va_end(args);
+
+  String buffer = malloc(len + 1);
+  if (!buffer) return NULL;
+
+  va_start(args, fmt);
+  vsnprintf(buffer, len + 1, fmt, args);
+  va_end(args);
+
+  return buffer;
 }
